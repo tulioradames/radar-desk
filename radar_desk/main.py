@@ -35,7 +35,7 @@ def main() -> int:
     try:
         database = Database(paths.database)
         database.initialize()
-        window = MainWindow(database)
+        window = MainWindow(database, paths.files_dir)
         window.show()
         logger.info("Radar Desk v%s iniciado", APP_VERSION)
         return app.exec()
