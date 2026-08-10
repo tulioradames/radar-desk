@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
         self.tickets_page.tickets_changed.connect(self._refresh_dashboard)
         self._add_page(
             "Chamados",
-            "Cadastre, edite e acompanhe solicitações armazenadas localmente.",
+            "Busque, filtre e registre todo o fluxo de atendimento local.",
             self.tickets_page,
         )
         self._add_page(
@@ -193,14 +193,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("CADASTRO LOCAL DISPONÍVEL")
+        eyebrow = QLabel("GESTÃO OPERACIONAL DISPONÍVEL")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Chamados organizados, mesmo sem internet.")
+        title = QLabel("Do registro à resolução, tudo fica rastreável.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Crie, edite e acompanhe solicitações com protocolo automático. "
-            "Tudo permanece armazenado com segurança neste computador."
+            "Busque, filtre, atribua responsáveis e registre comentários. "
+            "Cada alteração permanece no histórico local do chamado."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(roadmap_title)
         roadmap_layout.addWidget(RoadmapItem("1", "Base do aplicativo", "Janela, navegação, temas e SQLite", True))
         roadmap_layout.addWidget(RoadmapItem("2", "Cadastro de chamados", "CRUD local e protocolo automático", True))
-        roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações"))
+        roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações", True))
         layout.addWidget(roadmap)
         layout.addStretch()
 

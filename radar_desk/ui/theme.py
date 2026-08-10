@@ -164,7 +164,7 @@ QFrame#divider {
     background: #e2e8f0;
     max-height: 1px;
 }
-QLineEdit, QTextEdit, QComboBox {
+QLineEdit, QTextEdit, QComboBox, QDateEdit {
     background: #ffffff;
     color: #172033;
     border: 1px solid #cfd8e5;
@@ -172,7 +172,7 @@ QLineEdit, QTextEdit, QComboBox {
     padding: 9px 10px;
     selection-background-color: #2dd4bf;
 }
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDateEdit:focus {
     border: 2px solid #14b8a6;
 }
 QComboBox::drop-down {
@@ -282,6 +282,71 @@ QLabel#detailDescription {
     border-radius: 9px;
     padding: 11px;
 }
+QLabel#assigneeLabel {
+    color: #334155;
+    background: #eefbf8;
+    border: 1px solid #c5eee7;
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-weight: 600;
+}
+QCheckBox {
+    color: #48566a;
+    spacing: 7px;
+}
+QTabWidget::pane {
+    border: 1px solid #e1e7ef;
+    border-radius: 9px;
+    background: #ffffff;
+    top: -1px;
+}
+QTabBar::tab {
+    background: #eef2f7;
+    color: #667085;
+    border: 1px solid #dfe5ed;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 650;
+}
+QTabBar::tab:first { border-top-left-radius: 7px; }
+QTabBar::tab:last { border-top-right-radius: 7px; }
+QTabBar::tab:selected {
+    background: #ffffff;
+    color: #0f8f7f;
+    border-bottom-color: #ffffff;
+}
+QListWidget#interactionList {
+    background: #ffffff;
+    color: #344054;
+    border: none;
+    outline: none;
+}
+QListWidget#interactionList::item {
+    border-bottom: 1px solid #edf1f5;
+    padding: 9px 6px;
+}
+QScrollArea#detailScroll, QScrollArea#detailScroll > QWidget > QWidget {
+    background: transparent;
+    border: none;
+}
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #cbd5e1;
+    min-height: 22px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical:hover { background: #94a3b8; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+    background: none;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
 """
 
 
@@ -336,7 +401,7 @@ QFrame#divider {
     color: #29384e;
     background: #29384e;
 }
-QLineEdit, QTextEdit, QComboBox {
+QLineEdit, QTextEdit, QComboBox, QDateEdit {
     background: #172235;
     color: #e7edf7;
     border-color: #34445b;
@@ -379,6 +444,31 @@ QLabel#detailDescription {
     background: #172235;
     border-color: #29384e;
 }
+QLabel#assigneeLabel {
+    color: #b9f5e9;
+    background: #163530;
+    border-color: #28574f;
+}
+QCheckBox { color: #b8c4d5; }
+QTabWidget::pane {
+    border-color: #29384e;
+    background: #121b2b;
+}
+QTabBar::tab {
+    background: #172235;
+    color: #9eacc0;
+    border-color: #2b3a50;
+}
+QTabBar::tab:selected {
+    background: #121b2b;
+    color: #5eead4;
+    border-bottom-color: #121b2b;
+}
+QListWidget#interactionList {
+    background: #121b2b;
+    color: #d3dce8;
+}
+QListWidget#interactionList::item { border-bottom-color: #26344a; }
 """
 
 
