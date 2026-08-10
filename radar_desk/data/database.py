@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class Database:
@@ -46,6 +46,9 @@ class Database:
             )
             if current_version < 2:
                 self._migrate_to_v2(connection)
+                current_version = 2
+            if current_version < 3:
+                self._migrate_to_v3(connection)
 
     @staticmethod
     def _migrate_to_v2(connection: sqlite3.Connection) -> None:
@@ -75,6 +78,59 @@ class Database:
 
             UPDATE schema_info
             SET version = 2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1;
+            """
+        )
+
+    @staticmethod
+    def _migrate_to_v3(connection: sqlite3.Connection) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(tickets)").fetchall()
+        }
+        if "assignee" not in columns:
+            connection.execute(
+                "ALTER TABLE tickets ADD COLUMN assignee TEXT NOT NULL DEFAULT ''"
+            )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS ticket_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                field_name TEXT NOT NULL DEFAULT '',
+                old_value TEXT NOT NULL DEFAULT '',
+                new_value TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket
+                ON ticket_history(ticket_id, created_at DESC, id DESC);
+
+            CREATE TABLE IF NOT EXISTS ticket_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL,
+                author TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket
+                ON ticket_comments(ticket_id, created_at DESC, id DESC);
+
+            INSERT INTO ticket_history (
+                ticket_id, action, field_name, old_value, new_value, created_at
+            )
+            SELECT id, 'Chamado importado', '', '', '', updated_at
+            FROM tickets
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ticket_history WHERE ticket_history.ticket_id = tickets.id
+            );
+
+            UPDATE schema_info
+            SET version = 3, updated_at = CURRENT_TIMESTAMP
             WHERE id = 1;
             """
         )

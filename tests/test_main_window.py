@@ -41,6 +41,7 @@ def test_ticket_page_updates_after_local_creation() -> None:
                 description="O monitor principal não exibe imagem.",
                 category="Hardware",
                 priority="Alta",
+                assignee="Equipe de Campo",
             )
         )
 
@@ -49,6 +50,40 @@ def test_ticket_page_updates_after_local_creation() -> None:
         assert window.tickets_page.table.rowCount() == 1
         assert window.tickets_page.selected_ticket() == ticket
         assert window.tickets_page.detail_protocol.text() == ticket.protocol
+        assert "Equipe de Campo" in window.tickets_page.detail_assignee.text()
+        window.close()
+    app.processEvents()
+
+
+def test_ticket_page_general_search_filters_rows() -> None:
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        database = Database(Path(directory) / "test.sqlite3")
+        database.initialize()
+        window = MainWindow(database)
+        window.ticket_service.create(
+            TicketInput(
+                title="Falha na VPN",
+                description="A VPN não estabelece conexão.",
+                category="Rede e internet",
+                priority="Alta",
+                assignee="Equipe Redes",
+            )
+        )
+        window.ticket_service.create(
+            TicketInput(
+                title="Atualizar navegador",
+                description="O navegador está em versão antiga.",
+                category="Software",
+                priority="Baixa",
+            )
+        )
+        window.tickets_page.refresh()
+
+        window.tickets_page.search_input.setText("Equipe Redes")
+
+        assert window.tickets_page.table.rowCount() == 1
+        assert window.tickets_page.selected_ticket().title == "Falha na VPN"
         window.close()
     app.processEvents()
 

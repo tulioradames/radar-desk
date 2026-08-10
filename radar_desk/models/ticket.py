@@ -26,6 +26,17 @@ class TicketInput:
     category: str
     priority: str
     status: str = "Aberto"
+    assignee: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class TicketFilter:
+    search: str = ""
+    status: str = ""
+    priority: str = ""
+    category: str = ""
+    start_date: str = ""
+    end_date: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +48,7 @@ class Ticket:
     category: str
     priority: str
     status: str
+    assignee: str
     created_at: str
     updated_at: str
 
@@ -47,3 +59,23 @@ class Ticket:
             return parsed.strftime("%d/%m/%Y às %H:%M")
         except ValueError:
             return value
+
+
+@dataclass(frozen=True, slots=True)
+class TicketHistory:
+    id: int
+    ticket_id: int
+    action: str
+    field_name: str
+    old_value: str
+    new_value: str
+    created_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class TicketComment:
+    id: int
+    ticket_id: int
+    author: str
+    content: str
+    created_at: str

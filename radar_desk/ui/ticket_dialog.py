@@ -82,6 +82,12 @@ class TicketDialog(QDialog):
         self.status_input = QComboBox()
         self.status_input.addItems(STATUSES)
         form.addRow("Status *", self.status_input)
+
+        self.assignee_input = QLineEdit()
+        self.assignee_input.setMaxLength(100)
+        self.assignee_input.setPlaceholderText("Ex.: Equipe de suporte ou nome do atendente")
+        self.assignee_input.setClearButtonEnabled(True)
+        form.addRow("Responsável", self.assignee_input)
         layout.addLayout(form)
 
         self.error_label = QLabel()
@@ -110,6 +116,7 @@ class TicketDialog(QDialog):
         self.category_input.setCurrentText(ticket.category)
         self.priority_input.setCurrentText(ticket.priority)
         self.status_input.setCurrentText(ticket.status)
+        self.assignee_input.setText(ticket.assignee)
 
     def _validate_and_accept(self) -> None:
         title = self.title_input.text().strip()
@@ -135,4 +142,5 @@ class TicketDialog(QDialog):
             category=self.category_input.currentText(),
             priority=self.priority_input.currentText(),
             status=self.status_input.currentText(),
+            assignee=self.assignee_input.text(),
         )
