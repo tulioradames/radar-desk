@@ -232,6 +232,21 @@ QLabel#countBadge {
     padding: 5px 10px;
     font-weight: 700;
 }
+QLabel#privacyNotice {
+    color: #155e75;
+    background: #ecfeff;
+    border: 1px solid #a5f3fc;
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-weight: 600;
+}
+QLabel#screenshotPreview {
+    color: #718096;
+    background: #f8fafc;
+    border: 1px dashed #b9c5d4;
+    border-radius: 10px;
+    padding: 8px;
+}
 QTableWidget {
     background: #ffffff;
     alternate-background-color: #f8fafc;
@@ -450,6 +465,16 @@ QLabel#assigneeLabel {
     border-color: #28574f;
 }
 QCheckBox { color: #b8c4d5; }
+QLabel#privacyNotice {
+    color: #a5f3fc;
+    background: #12303a;
+    border-color: #245362;
+}
+QLabel#screenshotPreview {
+    color: #9eacc0;
+    background: #172235;
+    border-color: #3a4b62;
+}
 QTabWidget::pane {
     border-color: #29384e;
     background: #121b2b;

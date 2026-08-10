@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QApplication,
@@ -20,18 +22,25 @@ from PySide6.QtWidgets import (
 
 from radar_desk.core.config import APP_NAME, APP_VERSION, ORGANIZATION_NAME
 from radar_desk.data.database import Database
+from radar_desk.data.diagnostic_repository import DiagnosticRepository
 from radar_desk.data.ticket_repository import TicketRepository
+from radar_desk.services.diagnostic_service import DiagnosticService
 from radar_desk.services.ticket_service import TicketService
+from radar_desk.ui.diagnostic_page import DiagnosticPage
 from radar_desk.ui.theme import Theme, stylesheet
 from radar_desk.ui.tickets_page import TicketsPage
 from radar_desk.ui.widgets import RadarLogo, RoadmapItem, StatCard
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, files_dir: Path | None = None) -> None:
         super().__init__()
         self.database = database
         self.ticket_service = TicketService(TicketRepository(database))
+        self.diagnostic_service = DiagnosticService(
+            DiagnosticRepository(database),
+            files_dir or (database.path.parent / "arquivos"),
+        )
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
         self.page_metadata: list[tuple[str, str]] = []
@@ -73,10 +82,16 @@ class MainWindow(QMainWindow):
             "Busque, filtre e registre todo o fluxo de atendimento local.",
             self.tickets_page,
         )
+        self.diagnostic_page = DiagnosticPage(
+            self.ticket_service,
+            self.diagnostic_service,
+        )
+        self.tickets_page.tickets_changed.connect(self.diagnostic_page.refresh_tickets)
+        self.diagnostic_page.diagnostic_attached.connect(self._diagnostic_attached)
         self._add_page(
             "Diagnóstico",
-            "Coleta transparente de informações do computador.",
-            self._build_coming_page("0.4", "Diagnóstico automático", "A coleta só será anexada após mostrar e confirmar todos os dados."),
+            "Colete, revise e anexe informações técnicas com consentimento.",
+            self.diagnostic_page,
         )
         self._add_page(
             "Relatórios",
@@ -193,14 +208,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("GESTÃO OPERACIONAL DISPONÍVEL")
+        eyebrow = QLabel("DIAGNÓSTICO TRANSPARENTE DISPONÍVEL")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Do registro à resolução, tudo fica rastreável.")
+        title = QLabel("Contexto técnico para resolver mais rápido.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Busque, filtre, atribua responsáveis e registre comentários. "
-            "Cada alteração permanece no histórico local do chamado."
+            "Colete dados do computador, revise cada campo e anexe ao chamado. "
+            "Capturas de tela exigem autorização separada e explícita."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -236,6 +251,8 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("1", "Base do aplicativo", "Janela, navegação, temas e SQLite", True))
         roadmap_layout.addWidget(RoadmapItem("2", "Cadastro de chamados", "CRUD local e protocolo automático", True))
         roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações", True))
+        roadmap_layout.addWidget(RoadmapItem("4", "Diagnóstico automático", "Sistema, recursos, rede, ping e consentimento", True))
+        roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos"))
         layout.addWidget(roadmap)
         layout.addStretch()
 
@@ -323,6 +340,9 @@ class MainWindow(QMainWindow):
     def _refresh_dashboard(self) -> None:
         self.total_card.set_value(str(self.ticket_service.count_all()))
         self.active_card.set_value(str(self.ticket_service.count_active()))
+
+    def _diagnostic_attached(self, ticket_id: int) -> None:
+        self.tickets_page.refresh(ticket_id)
 
     def _restore_theme(self) -> None:
         value = self.settings.value("appearance/theme", Theme.LIGHT.value)

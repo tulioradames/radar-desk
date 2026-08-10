@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class Database:
@@ -49,6 +49,9 @@ class Database:
                 current_version = 2
             if current_version < 3:
                 self._migrate_to_v3(connection)
+                current_version = 3
+            if current_version < 4:
+                self._migrate_to_v4(connection)
 
     @staticmethod
     def _migrate_to_v2(connection: sqlite3.Connection) -> None:
@@ -131,6 +134,29 @@ class Database:
 
             UPDATE schema_info
             SET version = 3, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1;
+            """
+        )
+
+    @staticmethod
+    def _migrate_to_v4(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS ticket_diagnostics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL,
+                data_json TEXT NOT NULL,
+                report_path TEXT NOT NULL,
+                screenshot_path TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ticket_diagnostics_ticket
+                ON ticket_diagnostics(ticket_id, created_at DESC, id DESC);
+
+            UPDATE schema_info
+            SET version = 4, updated_at = CURRENT_TIMESTAMP
             WHERE id = 1;
             """
         )
