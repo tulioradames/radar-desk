@@ -71,14 +71,17 @@ class StatCard(QFrame):
 
         text = QVBoxLayout()
         text.setSpacing(4)
-        value_label = QLabel(value)
-        value_label.setProperty("statValue", True)
+        self.value_label = QLabel(value)
+        self.value_label.setProperty("statValue", True)
         caption = QLabel(label)
         caption.setProperty("statLabel", True)
-        text.addWidget(value_label)
+        text.addWidget(self.value_label)
         text.addWidget(caption)
         text.addStretch()
         layout.addLayout(text, 1)
+
+    def set_value(self, value: str) -> None:
+        self.value_label.setText(value)
 
 
 class RoadmapItem(QFrame):

@@ -20,7 +20,10 @@ from PySide6.QtWidgets import (
 
 from radar_desk.core.config import APP_NAME, APP_VERSION, ORGANIZATION_NAME
 from radar_desk.data.database import Database
+from radar_desk.data.ticket_repository import TicketRepository
+from radar_desk.services.ticket_service import TicketService
 from radar_desk.ui.theme import Theme, stylesheet
+from radar_desk.ui.tickets_page import TicketsPage
 from radar_desk.ui.widgets import RadarLogo, RoadmapItem, StatCard
 
 
@@ -28,6 +31,7 @@ class MainWindow(QMainWindow):
     def __init__(self, database: Database) -> None:
         super().__init__()
         self.database = database
+        self.ticket_service = TicketService(TicketRepository(database))
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
         self.page_metadata: list[tuple[str, str]] = []
@@ -62,10 +66,12 @@ class MainWindow(QMainWindow):
             "Acompanhe a evolução e o estado local do Radar Desk.",
             self._build_dashboard(),
         )
+        self.tickets_page = TicketsPage(self.ticket_service)
+        self.tickets_page.tickets_changed.connect(self._refresh_dashboard)
         self._add_page(
             "Chamados",
-            "Cadastro e gerenciamento local de solicitações.",
-            self._build_coming_page("0.2", "Gestão de chamados", "O próximo módulo trará cadastro, edição, exclusão e protocolos automáticos."),
+            "Cadastre, edite e acompanhe solicitações armazenadas localmente.",
+            self.tickets_page,
         )
         self._add_page(
             "Diagnóstico",
@@ -187,14 +193,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("FUNDAÇÃO CONCLUÍDA")
+        eyebrow = QLabel("CADASTRO LOCAL DISPONÍVEL")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Seu suporte começa com uma base sólida.")
+        title = QLabel("Chamados organizados, mesmo sem internet.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "O Radar Desk já funciona de forma local, com interface modular, "
-            "persistência SQLite e uma identidade pronta para crescer."
+            "Crie, edite e acompanhe solicitações com protocolo automático. "
+            "Tudo permanece armazenado com segurança neste computador."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -207,10 +213,16 @@ class MainWindow(QMainWindow):
 
         stats = QHBoxLayout()
         stats.setSpacing(14)
-        db_value = "Pronto" if self.database.health_check() else "Indisponível"
-        stats.addWidget(StatCard("Banco de dados local", db_value, "#2dd4bf"))
-        stats.addWidget(StatCard("Versão instalada", f"v{APP_VERSION}", "#60a5fa"))
-        stats.addWidget(StatCard("Dependência de internet", "Nenhuma", "#a78bfa"))
+        self.total_card = StatCard(
+            "Total de chamados", str(self.ticket_service.count_all()), "#2dd4bf"
+        )
+        self.active_card = StatCard(
+            "Chamados ativos", str(self.ticket_service.count_active()), "#60a5fa"
+        )
+        self.version_card = StatCard("Versão instalada", f"v{APP_VERSION}", "#a78bfa")
+        stats.addWidget(self.total_card)
+        stats.addWidget(self.active_card)
+        stats.addWidget(self.version_card)
         layout.addLayout(stats)
 
         roadmap = QFrame()
@@ -222,7 +234,7 @@ class MainWindow(QMainWindow):
         roadmap_title.setObjectName("sectionTitle")
         roadmap_layout.addWidget(roadmap_title)
         roadmap_layout.addWidget(RoadmapItem("1", "Base do aplicativo", "Janela, navegação, temas e SQLite", True))
-        roadmap_layout.addWidget(RoadmapItem("2", "Cadastro de chamados", "CRUD local e protocolo automático"))
+        roadmap_layout.addWidget(RoadmapItem("2", "Cadastro de chamados", "CRUD local e protocolo automático", True))
         roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações"))
         layout.addWidget(roadmap)
         layout.addStretch()
@@ -305,6 +317,12 @@ class MainWindow(QMainWindow):
         self.page_subtitle.setText(subtitle)
         for button_index, button in enumerate(self.nav_buttons):
             button.setChecked(button_index == index)
+        if index == 0:
+            self._refresh_dashboard()
+
+    def _refresh_dashboard(self) -> None:
+        self.total_card.set_value(str(self.ticket_service.count_all()))
+        self.active_card.set_value(str(self.ticket_service.count_active()))
 
     def _restore_theme(self) -> None:
         value = self.settings.value("appearance/theme", Theme.LIGHT.value)

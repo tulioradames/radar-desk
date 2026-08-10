@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -39,6 +39,45 @@ class Database:
                 );
                 """
             )
+            current_version = int(
+                connection.execute(
+                    "SELECT version FROM schema_info WHERE id = 1"
+                ).fetchone()["version"]
+            )
+            if current_version < 2:
+                self._migrate_to_v2(connection)
+
+    @staticmethod
+    def _migrate_to_v2(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_tickets_updated_at
+                ON tickets(updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_tickets_status
+                ON tickets(status);
+
+            CREATE TABLE IF NOT EXISTS protocol_sequences (
+                year INTEGER PRIMARY KEY,
+                last_number INTEGER NOT NULL CHECK (last_number > 0)
+            );
+
+            UPDATE schema_info
+            SET version = 2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1;
+            """
+        )
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
