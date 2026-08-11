@@ -23,11 +23,12 @@ def test_main_window_has_all_base_pages() -> None:
         window = MainWindow(database)
 
         assert window.windowTitle().startswith("Radar Desk")
-        assert window.pages.count() == 5
-        assert len(window.nav_buttons) == 5
+        assert window.pages.count() == 6
+        assert len(window.nav_buttons) == 6
         assert window.database.health_check()
         assert window.tickets_page.list_stack.currentIndex() == 1
         assert window.diagnostic_page.ticket_combo.count() == 1
+        assert window.attachments_page.ticket_combo.count() == 1
         window.close()
     app.processEvents()
 
@@ -158,5 +159,47 @@ def test_theme_can_be_switched() -> None:
 
         expected = Theme.DARK if initial is Theme.LIGHT else Theme.LIGHT
         assert window.current_theme is expected
+        window.close()
+    app.processEvents()
+
+
+def test_attachment_page_previews_and_navigates_images() -> None:
+    app = QApplication.instance() or QApplication([])
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        database = Database(root / "test.sqlite3")
+        database.initialize()
+        window = MainWindow(database, root / "arquivos")
+        ticket = window.ticket_service.create(
+            TicketInput(
+                title="Evidências da tela",
+                description="Imagens mostram o erro apresentado pelo sistema.",
+                category="Software",
+                priority="Média",
+            )
+        )
+        sources = root / "fontes"
+        sources.mkdir()
+        for name, color in (("erro-1.png", "#2dd4bf"), ("erro-2.png", "#60a5fa")):
+            pixmap = QPixmap(80, 50)
+            pixmap.fill(QColor(color))
+            assert pixmap.save(str(sources / name), "PNG")
+
+        attached = window.attachment_service.attach_many(ticket, sources.glob("*.png"))
+        page = window.attachments_page
+        page.refresh_tickets(ticket.id)
+        records = window.attachment_service.list_for_ticket(ticket.id)
+        page.viewer.set_attachments(records)
+        page.viewer.show_attachment(records[0])
+
+        assert len(attached) == 2
+        assert page.files_list.count() == 2
+        assert not page.viewer.original_pixmap.isNull()
+        page.viewer.change_zoom(1.25)
+        assert page.viewer.fit_to_window is False
+        page.viewer.rotate_image(90)
+        assert page.viewer.rotation == 90
+        page.viewer.next_image()
+        assert page.viewer.current == records[1]
         window.close()
     app.processEvents()

@@ -21,11 +21,14 @@ from PySide6.QtWidgets import (
 )
 
 from radar_desk.core.config import APP_NAME, APP_VERSION, ORGANIZATION_NAME
+from radar_desk.data.attachment_repository import AttachmentRepository
 from radar_desk.data.database import Database
 from radar_desk.data.diagnostic_repository import DiagnosticRepository
 from radar_desk.data.ticket_repository import TicketRepository
+from radar_desk.services.attachment_service import AttachmentService
 from radar_desk.services.diagnostic_service import DiagnosticService
 from radar_desk.services.ticket_service import TicketService
+from radar_desk.ui.attachments_page import AttachmentsPage
 from radar_desk.ui.diagnostic_page import DiagnosticPage
 from radar_desk.ui.theme import Theme, stylesheet
 from radar_desk.ui.tickets_page import TicketsPage
@@ -36,10 +39,15 @@ class MainWindow(QMainWindow):
     def __init__(self, database: Database, files_dir: Path | None = None) -> None:
         super().__init__()
         self.database = database
+        self.files_dir = files_dir or (database.path.parent / "arquivos")
         self.ticket_service = TicketService(TicketRepository(database))
         self.diagnostic_service = DiagnosticService(
             DiagnosticRepository(database),
-            files_dir or (database.path.parent / "arquivos"),
+            self.files_dir,
+        )
+        self.attachment_service = AttachmentService(
+            AttachmentRepository(database),
+            self.files_dir,
         )
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
@@ -93,6 +101,17 @@ class MainWindow(QMainWindow):
             "Colete, revise e anexe informações técnicas com consentimento.",
             self.diagnostic_page,
         )
+        self.attachments_page = AttachmentsPage(
+            self.ticket_service,
+            self.attachment_service,
+        )
+        self.tickets_page.tickets_changed.connect(self.attachments_page.refresh_tickets)
+        self.attachments_page.attachments_changed.connect(self._attachment_attached)
+        self._add_page(
+            "Arquivos",
+            "Anexe evidências e visualize imagens sem sair do Radar Desk.",
+            self.attachments_page,
+        )
         self._add_page(
             "Relatórios",
             "Indicadores operacionais e exportações.",
@@ -136,8 +155,9 @@ class MainWindow(QMainWindow):
             ("Visão geral", 0),
             ("Chamados", 1),
             ("Diagnóstico", 2),
-            ("Relatórios", 3),
-            ("Ajustes", 4),
+            ("Arquivos", 3),
+            ("Relatórios", 4),
+            ("Ajustes", 5),
         ]
         for label, index in entries:
             layout.addWidget(self._nav_button(label, index))
@@ -208,14 +228,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("DIAGNÓSTICO TRANSPARENTE DISPONÍVEL")
+        eyebrow = QLabel("ARQUIVOS E EVIDÊNCIAS DISPONÍVEIS")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Contexto técnico para resolver mais rápido.")
+        title = QLabel("Todo o contexto do chamado em um só lugar.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Colete dados do computador, revise cada campo e anexe ao chamado. "
-            "Capturas de tela exigem autorização separada e explícita."
+            "Anexe imagens, documentos e logs, visualize evidências e mantenha "
+            "tudo organizado localmente por protocolo."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -252,7 +272,8 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("2", "Cadastro de chamados", "CRUD local e protocolo automático", True))
         roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações", True))
         roadmap_layout.addWidget(RoadmapItem("4", "Diagnóstico automático", "Sistema, recursos, rede, ping e consentimento", True))
-        roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos"))
+        roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos", True))
+        roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização"))
         layout.addWidget(roadmap)
         layout.addStretch()
 
@@ -343,6 +364,10 @@ class MainWindow(QMainWindow):
 
     def _diagnostic_attached(self, ticket_id: int) -> None:
         self.tickets_page.refresh(ticket_id)
+
+    def _attachment_attached(self, ticket_id: int) -> None:
+        self.tickets_page.refresh(ticket_id)
+        self._refresh_dashboard()
 
     def _restore_theme(self) -> None:
         value = self.settings.value("appearance/theme", Theme.LIGHT.value)
