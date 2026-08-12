@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
+    QSystemTrayIcon,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -58,6 +59,7 @@ class MainWindow(QMainWindow):
         self.resize(1280, 780)
         self._build_ui()
         self._restore_theme()
+        self._setup_sla_notifications()
         self._select_page(0)
 
     def _build_ui(self) -> None:
@@ -228,14 +230,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("ARQUIVOS E EVIDÊNCIAS DISPONÍVEIS")
+        eyebrow = QLabel("SLA E AUTOMAÇÕES DISPONÍVEIS")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Todo o contexto do chamado em um só lugar.")
+        title = QLabel("Prazos visíveis, atendimento mais previsível.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Anexe imagens, documentos e logs, visualize evidências e mantenha "
-            "tudo organizado localmente por protocolo."
+            "Acompanhe vencimentos por prioridade, receba alertas no Windows e "
+            "classifique novos chamados automaticamente."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -255,8 +257,12 @@ class MainWindow(QMainWindow):
             "Chamados ativos", str(self.ticket_service.count_active()), "#60a5fa"
         )
         self.version_card = StatCard("Versão instalada", f"v{APP_VERSION}", "#a78bfa")
+        self.overdue_card = StatCard(
+            "SLA atrasado", str(self.ticket_service.count_overdue()), "#fb7185"
+        )
         stats.addWidget(self.total_card)
         stats.addWidget(self.active_card)
+        stats.addWidget(self.overdue_card)
         stats.addWidget(self.version_card)
         layout.addLayout(stats)
 
@@ -273,7 +279,8 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("3", "Gestão operacional", "Busca, filtros, histórico e interações", True))
         roadmap_layout.addWidget(RoadmapItem("4", "Diagnóstico automático", "Sistema, recursos, rede, ping e consentimento", True))
         roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos", True))
-        roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização"))
+        roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização", True))
+        roadmap_layout.addWidget(RoadmapItem("7", "Usuários e sincronização", "Perfis, fila offline e Supabase"))
         layout.addWidget(roadmap)
         layout.addStretch()
 
@@ -361,6 +368,7 @@ class MainWindow(QMainWindow):
     def _refresh_dashboard(self) -> None:
         self.total_card.set_value(str(self.ticket_service.count_all()))
         self.active_card.set_value(str(self.ticket_service.count_active()))
+        self.overdue_card.set_value(str(self.ticket_service.count_overdue()))
 
     def _diagnostic_attached(self, ticket_id: int) -> None:
         self.tickets_page.refresh(ticket_id)
@@ -393,3 +401,43 @@ class MainWindow(QMainWindow):
         else:
             self.theme_button.setText("☾  Tema")
             self.theme_button.setToolTip("Ativar modo escuro")
+
+    def _setup_sla_notifications(self) -> None:
+        self.notified_sla_alerts: set[tuple[int, str]] = set()
+        self.tray_icon: QSystemTrayIcon | None = None
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray_icon = QSystemTrayIcon(QApplication.windowIcon(), self)
+            self.tray_icon.setToolTip(f"{APP_NAME} · alertas de SLA")
+            self.tray_icon.show()
+        self.sla_timer = QTimer(self)
+        self.sla_timer.setInterval(5 * 60 * 1000)
+        self.sla_timer.timeout.connect(self._check_sla_alerts)
+        self.sla_timer.start()
+        QTimer.singleShot(1500, self._check_sla_alerts)
+
+    def _check_sla_alerts(self) -> None:
+        alerts = self.ticket_service.automation.alerts(self.ticket_service.list_all())
+        active_keys = {(alert.ticket_id, alert.state) for alert in alerts}
+        self.notified_sla_alerts.intersection_update(active_keys)
+        new_alerts = [
+            alert
+            for alert in alerts
+            if (alert.ticket_id, alert.state) not in self.notified_sla_alerts
+        ]
+        for alert in new_alerts[:5]:
+            if self.tray_icon:
+                self.tray_icon.showMessage(
+                    alert.title,
+                    alert.message,
+                    QSystemTrayIcon.MessageIcon.Warning,
+                    8000,
+                )
+            self.notified_sla_alerts.add((alert.ticket_id, alert.state))
+        selected = self.tickets_page.selected_ticket()
+        self.tickets_page.refresh(selected.id if selected else None)
+        self._refresh_dashboard()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 - API Qt
+        if self.tray_icon:
+            self.tray_icon.hide()
+        super().closeEvent(event)

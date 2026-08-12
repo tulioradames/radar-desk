@@ -232,6 +232,44 @@ QLabel#countBadge {
     padding: 5px 10px;
     font-weight: 700;
 }
+QLabel#overdueBadge {
+    color: #be123c;
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-weight: 700;
+}
+QLabel#automationHint {
+    color: #0f766e;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 7px;
+    padding: 7px 9px;
+}
+QLabel#slaLabel {
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 8px 9px;
+    font-weight: 700;
+}
+QLabel#slaLabel[slaState="near_due"] {
+    color: #92400e;
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+QLabel#slaLabel[slaState="overdue"] {
+    color: #be123c;
+    background: #fff1f2;
+    border-color: #fecdd3;
+}
+QLabel#slaLabel[slaState="completed"] {
+    color: #475569;
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
 QLabel#privacyNotice {
     color: #155e75;
     background: #ecfeff;
@@ -509,6 +547,36 @@ QLabel#assigneeLabel {
     border-color: #28574f;
 }
 QCheckBox { color: #b8c4d5; }
+QLabel#overdueBadge {
+    color: #fda4af;
+    background: #3b1c27;
+    border-color: #6b293d;
+}
+QLabel#automationHint {
+    color: #a7f3d0;
+    background: #15352f;
+    border-color: #28574f;
+}
+QLabel#slaLabel {
+    color: #bbf7d0;
+    background: #15352f;
+    border-color: #28574f;
+}
+QLabel#slaLabel[slaState="near_due"] {
+    color: #fde68a;
+    background: #3a3017;
+    border-color: #665527;
+}
+QLabel#slaLabel[slaState="overdue"] {
+    color: #fda4af;
+    background: #3b1c27;
+    border-color: #6b293d;
+}
+QLabel#slaLabel[slaState="completed"] {
+    color: #cbd5e1;
+    background: #1e293b;
+    border-color: #475569;
+}
 QLabel#privacyNotice {
     color: #a5f3fc;
     background: #12303a;

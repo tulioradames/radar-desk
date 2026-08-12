@@ -153,6 +153,32 @@ class TicketRepository:
             ).fetchone()
         return self._from_row(row)
 
+    def close_resolved(self, ticket_id: int, now: datetime) -> Ticket:
+        timestamp = now.isoformat(timespec="seconds")
+        with self.database.connect() as connection:
+            existing = connection.execute(
+                "SELECT * FROM tickets WHERE id = ?", (ticket_id,)
+            ).fetchone()
+            if not existing:
+                raise TicketNotFoundError(f"Chamado {ticket_id} não encontrado")
+            connection.execute(
+                "UPDATE tickets SET status = 'Encerrado', updated_at = ? WHERE id = ?",
+                (timestamp, ticket_id),
+            )
+            self._insert_history(
+                connection,
+                ticket_id,
+                "Chamado encerrado",
+                "status",
+                str(existing["status"]),
+                "Encerrado",
+                timestamp,
+            )
+            row = connection.execute(
+                "SELECT * FROM tickets WHERE id = ?", (ticket_id,)
+            ).fetchone()
+        return self._from_row(row)
+
     def delete(self, ticket_id: int) -> None:
         with self.database.connect() as connection:
             cursor = connection.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))

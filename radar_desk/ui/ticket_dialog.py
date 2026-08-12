@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -20,9 +22,16 @@ from radar_desk.models.ticket import CATEGORIES, PRIORITIES, STATUSES, Ticket, T
 
 
 class TicketDialog(QDialog):
-    def __init__(self, ticket: Ticket | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        ticket: Ticket | None = None,
+        parent: QWidget | None = None,
+        category_suggester: Callable[[str, str], str] | None = None,
+    ) -> None:
         super().__init__(parent)
         self.ticket = ticket
+        self.category_suggester = category_suggester
+        self.category_manually_selected = ticket is not None
         self.setModal(True)
         self.setMinimumWidth(590)
         self.setWindowTitle("Editar chamado" if ticket else "Novo chamado")
@@ -61,6 +70,7 @@ class TicketDialog(QDialog):
         self.title_input.setMaxLength(150)
         self.title_input.setPlaceholderText("Ex.: Computador não conecta à rede")
         self.title_input.setClearButtonEnabled(True)
+        self.title_input.textChanged.connect(self._suggest_category)
         form.addRow("Título *", self.title_input)
 
         self.description_input = QTextEdit()
@@ -68,11 +78,20 @@ class TicketDialog(QDialog):
             "Descreva o problema, quando começou e o impacto percebido."
         )
         self.description_input.setMinimumHeight(145)
+        self.description_input.textChanged.connect(self._suggest_category)
         form.addRow("Descrição *", self.description_input)
 
         self.category_input = QComboBox()
         self.category_input.addItems(CATEGORIES)
+        self.category_input.activated.connect(self._category_selected)
+        if not self.ticket:
+            self.category_input.setCurrentText("Outros")
         form.addRow("Categoria *", self.category_input)
+
+        self.category_hint = QLabel("A categoria será sugerida conforme o conteúdo.")
+        self.category_hint.setObjectName("automationHint")
+        self.category_hint.setWordWrap(True)
+        form.addRow("", self.category_hint)
 
         self.priority_input = QComboBox()
         self.priority_input.addItems(PRIORITIES)
@@ -134,6 +153,22 @@ class TicketDialog(QDialog):
     def show_error(self, message: str) -> None:
         self.error_label.setText(message)
         self.error_label.show()
+
+    def _category_selected(self, _index: int) -> None:
+        self.category_manually_selected = True
+        self.category_hint.setText("Categoria definida manualmente.")
+
+    def _suggest_category(self, *_args) -> None:
+        if self.category_manually_selected or not self.category_suggester:
+            return
+        suggested = self.category_suggester(
+            self.title_input.text(), self.description_input.toPlainText()
+        )
+        self.category_input.setCurrentText(suggested)
+        if suggested == "Outros":
+            self.category_hint.setText("Continue descrevendo para receber uma sugestão.")
+        else:
+            self.category_hint.setText(f"Categoria sugerida automaticamente: {suggested}")
 
     def value(self) -> TicketInput:
         return TicketInput(

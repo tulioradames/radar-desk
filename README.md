@@ -1,6 +1,6 @@
 # Radar Desk
 
-Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.5.0** e adiciona arquivos e evidências organizados sem depender de serviços externos.
+Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.6.0** e adiciona SLA e automações operacionais sem depender de serviços externos.
 
 ## O que já está pronto
 
@@ -31,11 +31,16 @@ Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A ve
 - visualizador interno de imagens com zoom, ajuste, rotação e navegação;
 - abertura de documentos e logs no programa padrão do Windows;
 - organização automática de evidências nas pastas do protocolo;
+- prazos de SLA por prioridade: Crítica 4h, Alta 8h, Média 24h e Baixa 48h;
+- destaque visual para chamados atrasados e próximos do vencimento;
+- notificações nativas do Windows para alertas de SLA;
+- categorização automática por palavras-chave durante o cadastro;
+- confirmação antes de encerrar um chamado resolvido;
 - diretórios locais de dados, arquivos e logs;
 - estrutura modular preparada para as próximas versões;
 - testes automatizados da base e da interface.
 
-SLA, automações e relatórios permanecem preparados como módulos futuros.
+Usuários, sincronização e relatórios permanecem preparados como módulos futuros.
 
 ## Requisitos
 

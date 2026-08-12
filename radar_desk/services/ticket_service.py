@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from radar_desk.data.ticket_repository import TicketRepository
+from radar_desk.services.automation_service import AutomationService, SlaInfo
 from radar_desk.models.ticket import (
     CATEGORIES,
     PRIORITIES,
@@ -27,12 +28,24 @@ class TicketService:
         self,
         repository: TicketRepository,
         clock: Callable[[], datetime] | None = None,
+        automation: AutomationService | None = None,
     ) -> None:
         self.repository = repository
         self.clock = clock or (lambda: datetime.now().astimezone())
+        self.automation = automation or AutomationService(self.clock)
 
     def create(self, data: TicketInput) -> Ticket:
         normalized = self._validate(data)
+        suggested = self.suggest_category(normalized.title, normalized.description)
+        if normalized.category == "Outros" and suggested != "Outros":
+            normalized = TicketInput(
+                title=normalized.title,
+                description=normalized.description,
+                category=suggested,
+                priority=normalized.priority,
+                status=normalized.status,
+                assignee=normalized.assignee,
+            )
         return self.repository.create(normalized, self.clock())
 
     def update(self, ticket_id: int, data: TicketInput) -> Ticket:
@@ -55,9 +68,24 @@ class TicketService:
 
     def reopen(self, ticket_id: int) -> Ticket:
         ticket = self.repository.get(ticket_id)
-        if ticket.status != "Resolvido":
-            raise TicketValidationError("Somente chamados resolvidos podem ser reabertos.")
+        if ticket.status not in ("Resolvido", "Encerrado"):
+            raise TicketValidationError("Somente chamados resolvidos ou encerrados podem ser reabertos.")
         return self.repository.reopen(ticket_id, self.clock())
+
+    def close_resolved(self, ticket_id: int) -> Ticket:
+        ticket = self.repository.get(ticket_id)
+        if ticket.status != "Resolvido":
+            raise TicketValidationError("Somente chamados resolvidos podem ser encerrados.")
+        return self.repository.close_resolved(ticket_id, self.clock())
+
+    def suggest_category(self, title: str, description: str = "") -> str:
+        return self.automation.suggest_category(title, description)
+
+    def sla_for(self, ticket: Ticket) -> SlaInfo:
+        return self.automation.sla_for(ticket)
+
+    def count_overdue(self) -> int:
+        return sum(self.automation.sla_for(ticket).is_overdue for ticket in self.list_all())
 
     def add_comment(
         self,

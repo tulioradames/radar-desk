@@ -94,6 +94,10 @@ class TicketsPage(QWidget):
         self.total_label.setObjectName("countBadge")
         toolbar_layout.addWidget(self.total_label)
 
+        self.overdue_label = QLabel("0 atrasados")
+        self.overdue_label.setObjectName("overdueBadge")
+        toolbar_layout.addWidget(self.overdue_label)
+
         new_button = QPushButton("＋  Novo chamado")
         new_button.setProperty("primary", True)
         new_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -174,7 +178,7 @@ class TicketsPage(QWidget):
         list_layout.setContentsMargins(1, 1, 1, 1)
 
         self.list_stack = QStackedWidget()
-        self.table = QTableWidget(0, 7)
+        self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
             (
                 "Protocolo",
@@ -183,6 +187,7 @@ class TicketsPage(QWidget):
                 "Prioridade",
                 "Status",
                 "Responsável",
+                "SLA",
                 "Atualizado",
             )
         )
@@ -193,7 +198,7 @@ class TicketsPage(QWidget):
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(44)
         header = self.table.horizontalHeader()
-        for column in (0, 2, 3, 4, 5, 6):
+        for column in (0, 2, 3, 4, 5, 6, 7):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.itemSelectionChanged.connect(self._show_selection)
@@ -246,6 +251,12 @@ class TicketsPage(QWidget):
         self.reopen_button.hide()
         detail_layout.addWidget(self.reopen_button)
 
+        self.close_button = QPushButton("✓  Confirmar e encerrar")
+        self.close_button.setProperty("primary", True)
+        self.close_button.clicked.connect(self._close_selected)
+        self.close_button.hide()
+        detail_layout.addWidget(self.close_button)
+
         actions = QHBoxLayout()
         self.edit_button = QPushButton("Editar")
         self.edit_button.setProperty("secondary", True)
@@ -281,6 +292,9 @@ class TicketsPage(QWidget):
         self.detail_assignee = QLabel()
         self.detail_assignee.setObjectName("assigneeLabel")
         self.detail_assignee.setWordWrap(True)
+        self.detail_sla = QLabel()
+        self.detail_sla.setObjectName("slaLabel")
+        self.detail_sla.setWordWrap(True)
         self.detail_description = QLabel(
             "Os dados completos do chamado selecionado aparecerão aqui."
         )
@@ -293,6 +307,7 @@ class TicketsPage(QWidget):
         layout.addWidget(self.detail_title)
         layout.addWidget(self.detail_meta)
         layout.addWidget(self.detail_assignee)
+        layout.addWidget(self.detail_sla)
         layout.addWidget(self.detail_description)
         layout.addStretch()
         layout.addWidget(self.detail_dates)
@@ -355,6 +370,7 @@ class TicketsPage(QWidget):
         self.tickets = {ticket.id: ticket for ticket in tickets}
         self.table.setRowCount(len(tickets))
         for row, ticket in enumerate(tickets):
+            sla = self.service.sla_for(ticket)
             values = (
                 ticket.protocol,
                 ticket.title,
@@ -362,6 +378,7 @@ class TicketsPage(QWidget):
                 ticket.priority,
                 ticket.status,
                 ticket.assignee or "Não atribuído",
+                sla.label,
                 Ticket.format_datetime(ticket.updated_at),
             )
             for column, value in enumerate(values):
@@ -371,9 +388,20 @@ class TicketsPage(QWidget):
                     self._color_priority(item, ticket.priority)
                 if column == 4:
                     self._color_status(item, ticket.status)
+                if sla.is_overdue:
+                    item.setBackground(QColor("#fff1f2"))
+                    item.setForeground(QColor("#be123c"))
+                    item.setToolTip(
+                        f"SLA vencido em {Ticket.format_datetime(sla.due_at.isoformat())}"
+                    )
+                elif sla.is_near_due and column == 6:
+                    item.setBackground(QColor("#fef3c7"))
+                    item.setForeground(QColor("#a16207"))
                 self.table.setItem(row, column, item)
 
         total = self.service.count_all()
+        overdue = self.service.count_overdue()
+        self.overdue_label.setText(f"{overdue} atrasado" if overdue == 1 else f"{overdue} atrasados")
         if self._has_filters():
             self.total_label.setText(f"{len(tickets)} de {total}")
         else:
@@ -432,6 +460,13 @@ class TicketsPage(QWidget):
         self.detail_title.setText(ticket.title)
         self.detail_meta.setText(f"{ticket.category}  •  {ticket.priority}  •  {ticket.status}")
         self.detail_assignee.setText(f"Responsável: {ticket.assignee or 'Não atribuído'}")
+        sla = self.service.sla_for(ticket)
+        self.detail_sla.setText(
+            f"SLA: {sla.label} · prazo {Ticket.format_datetime(sla.due_at.isoformat())}"
+        )
+        self.detail_sla.setProperty("slaState", sla.state)
+        self.detail_sla.style().unpolish(self.detail_sla)
+        self.detail_sla.style().polish(self.detail_sla)
         self.detail_description.setText(ticket.description)
         self.detail_dates.setText(
             f"Aberto em {Ticket.format_datetime(ticket.created_at)}\n"
@@ -439,7 +474,8 @@ class TicketsPage(QWidget):
         )
         self.edit_button.setEnabled(True)
         self.delete_button.setEnabled(True)
-        self.reopen_button.setVisible(ticket.status == "Resolvido")
+        self.reopen_button.setVisible(ticket.status in ("Resolvido", "Encerrado"))
+        self.close_button.setVisible(ticket.status == "Resolvido")
         self.comment_author.setEnabled(True)
         self.comment_input.setEnabled(True)
         self.comment_button.setEnabled(True)
@@ -479,6 +515,7 @@ class TicketsPage(QWidget):
         self.detail_title.setText("—")
         self.detail_meta.clear()
         self.detail_assignee.clear()
+        self.detail_sla.clear()
         self.detail_description.setText(
             "Os dados completos do chamado selecionado aparecerão aqui."
         )
@@ -488,12 +525,13 @@ class TicketsPage(QWidget):
         self.edit_button.setEnabled(False)
         self.delete_button.setEnabled(False)
         self.reopen_button.hide()
+        self.close_button.hide()
         self.comment_author.setEnabled(False)
         self.comment_input.setEnabled(False)
         self.comment_button.setEnabled(False)
 
     def _create_ticket(self) -> None:
-        dialog = TicketDialog(parent=self)
+        dialog = TicketDialog(parent=self, category_suggester=self.service.suggest_category)
         if dialog.exec() != TicketDialog.DialogCode.Accepted:
             return
         try:
@@ -508,7 +546,7 @@ class TicketsPage(QWidget):
         ticket = self.selected_ticket()
         if not ticket:
             return
-        dialog = TicketDialog(ticket, self)
+        dialog = TicketDialog(ticket, self, category_suggester=self.service.suggest_category)
         if dialog.exec() != TicketDialog.DialogCode.Accepted:
             return
         try:
@@ -551,6 +589,28 @@ class TicketsPage(QWidget):
             return
         reopened = self.service.reopen(ticket.id)
         self.refresh(reopened.id)
+        self.tickets_changed.emit()
+
+    def _close_selected(self) -> None:
+        ticket = self.selected_ticket()
+        if not ticket:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Confirmar encerramento",
+            f"O chamado {ticket.protocol} está resolvido. Deseja confirmar a solução "
+            "e encerrá-lo?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            closed = self.service.close_resolved(ticket.id)
+        except TicketValidationError as error:
+            QMessageBox.warning(self, "Não foi possível encerrar", str(error))
+            return
+        self.refresh(closed.id)
         self.tickets_changed.emit()
 
     def _add_comment(self) -> None:
@@ -616,6 +676,7 @@ class TicketsPage(QWidget):
             "Em andamento": ("#dbeafe", "#1d4ed8"),
             "Aguardando": ("#fef3c7", "#a16207"),
             "Resolvido": ("#e2e8f0", "#475569"),
+            "Encerrado": ("#d1d5db", "#374151"),
         }
         background, foreground = colors.get(status, ("#e2e8f0", "#334155"))
         item.setBackground(QColor(background))
