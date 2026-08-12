@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class Database:
@@ -52,6 +52,9 @@ class Database:
                 current_version = 3
             if current_version < 4:
                 self._migrate_to_v4(connection)
+                current_version = 4
+            if current_version < 5:
+                self._migrate_to_v5(connection)
 
     @staticmethod
     def _migrate_to_v2(connection: sqlite3.Connection) -> None:
@@ -157,6 +160,32 @@ class Database:
 
             UPDATE schema_info
             SET version = 4, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1;
+            """
+        )
+
+    @staticmethod
+    def _migrate_to_v5(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS ticket_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticket_id INTEGER NOT NULL,
+                original_name TEXT NOT NULL,
+                stored_name TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ticket_attachments_ticket
+                ON ticket_attachments(ticket_id, created_at DESC, id DESC);
+
+            UPDATE schema_info
+            SET version = 5, updated_at = CURRENT_TIMESTAMP
             WHERE id = 1;
             """
         )

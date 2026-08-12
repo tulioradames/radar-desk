@@ -1,6 +1,6 @@
 # Radar Desk
 
-Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.4.0** e adiciona diagnóstico técnico transparente sem depender de serviços externos.
+Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.5.0** e adiciona arquivos e evidências organizados sem depender de serviços externos.
 
 ## O que já está pronto
 
@@ -26,11 +26,16 @@ Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A ve
 - prévia exata de todos os dados antes do anexo;
 - captura da tela principal somente após autorização explícita;
 - relatórios JSON organizados por protocolo e vinculados ao chamado;
+- anexos de imagens, documentos e logs com limite de 50 MB por arquivo;
+- arrastar e soltar arquivos diretamente no chamado;
+- visualizador interno de imagens com zoom, ajuste, rotação e navegação;
+- abertura de documentos e logs no programa padrão do Windows;
+- organização automática de evidências nas pastas do protocolo;
 - diretórios locais de dados, arquivos e logs;
 - estrutura modular preparada para as próximas versões;
 - testes automatizados da base e da interface.
 
-Arquivos gerais, automações e relatórios permanecem preparados como módulos futuros.
+SLA, automações e relatórios permanecem preparados como módulos futuros.
 
 ## Requisitos
 
@@ -75,6 +80,10 @@ Por padrão, os dados são gravados em:
 %LOCALAPPDATA%\RadarDesk\
 ├── radar_desk.sqlite3
 ├── arquivos\
+│   └── RD-2026-0001\
+│       ├── imagens\
+│       ├── documentos\
+│       └── diagnosticos\
 └── logs\
 ```
 
