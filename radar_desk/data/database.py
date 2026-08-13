@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class Database:
@@ -55,6 +55,9 @@ class Database:
                 current_version = 4
             if current_version < 5:
                 self._migrate_to_v5(connection)
+                current_version = 5
+            if current_version < 6:
+                self._migrate_to_v6(connection)
 
     @staticmethod
     def _migrate_to_v2(connection: sqlite3.Connection) -> None:
@@ -186,6 +189,60 @@ class Database:
 
             UPDATE schema_info
             SET version = 5, updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1;
+            """
+        )
+
+    @staticmethod
+    def _migrate_to_v6(connection: sqlite3.Connection) -> None:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                display_name TEXT NOT NULL,
+                role TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                password_salt TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT NOT NULL,
+                action TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL DEFAULT '',
+                details TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_log_created
+                ON audit_log(created_at DESC, id DESC);
+
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                local_version INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sync_queue_status
+                ON sync_queue(status, created_at, id);
+
+            UPDATE schema_info
+            SET version = 6, updated_at = CURRENT_TIMESTAMP
             WHERE id = 1;
             """
         )

@@ -7,6 +7,7 @@ from datetime import datetime
 
 from radar_desk.data.ticket_repository import TicketRepository
 from radar_desk.services.automation_service import AutomationService, SlaInfo
+from radar_desk.services.change_tracker import ChangeTracker
 from radar_desk.models.ticket import (
     CATEGORIES,
     PRIORITIES,
@@ -29,10 +30,12 @@ class TicketService:
         repository: TicketRepository,
         clock: Callable[[], datetime] | None = None,
         automation: AutomationService | None = None,
+        tracker: ChangeTracker | None = None,
     ) -> None:
         self.repository = repository
         self.clock = clock or (lambda: datetime.now().astimezone())
         self.automation = automation or AutomationService(self.clock)
+        self.tracker = tracker
 
     def create(self, data: TicketInput) -> Ticket:
         normalized = self._validate(data)
@@ -46,14 +49,22 @@ class TicketService:
                 status=normalized.status,
                 assignee=normalized.assignee,
             )
-        return self.repository.create(normalized, self.clock())
+        ticket = self.repository.create(normalized, self.clock())
+        self._record("Chamado criado", ticket, "create")
+        return ticket
 
     def update(self, ticket_id: int, data: TicketInput) -> Ticket:
+        self._require_manage()
         normalized = self._validate(data)
-        return self.repository.update(ticket_id, normalized, self.clock())
+        ticket = self.repository.update(ticket_id, normalized, self.clock())
+        self._record("Chamado atualizado", ticket, "update")
+        return ticket
 
     def delete(self, ticket_id: int) -> None:
+        self._require_admin()
+        ticket = self.repository.get(ticket_id)
         self.repository.delete(ticket_id)
+        self._record("Chamado excluído", ticket, "delete")
 
     def get(self, ticket_id: int) -> Ticket:
         return self.repository.get(ticket_id)
@@ -67,16 +78,22 @@ class TicketService:
         return self.repository.list_filtered(filters)
 
     def reopen(self, ticket_id: int) -> Ticket:
+        self._require_manage()
         ticket = self.repository.get(ticket_id)
         if ticket.status not in ("Resolvido", "Encerrado"):
             raise TicketValidationError("Somente chamados resolvidos ou encerrados podem ser reabertos.")
-        return self.repository.reopen(ticket_id, self.clock())
+        reopened = self.repository.reopen(ticket_id, self.clock())
+        self._record("Chamado reaberto", reopened, "update")
+        return reopened
 
     def close_resolved(self, ticket_id: int) -> Ticket:
+        self._require_manage()
         ticket = self.repository.get(ticket_id)
         if ticket.status != "Resolvido":
             raise TicketValidationError("Somente chamados resolvidos podem ser encerrados.")
-        return self.repository.close_resolved(ticket_id, self.clock())
+        closed = self.repository.close_resolved(ticket_id, self.clock())
+        self._record("Chamado encerrado", closed, "update")
+        return closed
 
     def suggest_category(self, title: str, description: str = "") -> str:
         return self.automation.suggest_category(title, description)
@@ -101,12 +118,19 @@ class TicketService:
             raise TicketValidationError("O comentário deve ter no máximo 2.000 caracteres.")
         if len(normalized_author) > 100:
             raise TicketValidationError("O nome do autor deve ter no máximo 100 caracteres.")
-        return self.repository.add_comment(
+        comment = self.repository.add_comment(
             ticket_id,
             normalized_author,
             normalized_content,
             self.clock(),
         )
+        if self.tracker:
+            ticket = self.repository.get(ticket_id)
+            self.tracker.record(
+                "Comentário adicionado", "ticket_comment",
+                f"{ticket.protocol}:{comment.id}", "create", comment
+            )
+        return comment
 
     def get_comments(self, ticket_id: int) -> list[TicketComment]:
         return self.repository.get_comments(ticket_id)
@@ -119,6 +143,18 @@ class TicketService:
 
     def count_active(self) -> int:
         return self.repository.count_active()
+
+    def _record(self, action: str, ticket: Ticket, operation: str) -> None:
+        if self.tracker:
+            self.tracker.record(action, "ticket", ticket.protocol, operation, ticket)
+
+    def _require_manage(self) -> None:
+        if self.tracker and not self.tracker.user.can_manage_tickets:
+            raise TicketValidationError("Seu perfil não permite alterar chamados.")
+
+    def _require_admin(self) -> None:
+        if self.tracker and not self.tracker.user.can_administer:
+            raise TicketValidationError("Somente administradores podem excluir chamados.")
 
     @staticmethod
     def _validate(data: TicketInput) -> TicketInput:

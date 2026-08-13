@@ -23,8 +23,8 @@ def test_main_window_has_all_base_pages() -> None:
         window = MainWindow(database)
 
         assert window.windowTitle().startswith("Radar Desk")
-        assert window.pages.count() == 6
-        assert len(window.nav_buttons) == 6
+        assert window.pages.count() == 7
+        assert len(window.nav_buttons) == 7
         assert window.database.health_check()
         assert window.tickets_page.list_stack.currentIndex() == 1
         assert window.diagnostic_page.ticket_combo.count() == 1

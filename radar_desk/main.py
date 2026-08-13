@@ -13,7 +13,13 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from radar_desk.core.config import APP_NAME, APP_VERSION, get_app_paths
 from radar_desk.core.logging_config import configure_logging
 from radar_desk.data.database import Database
+from radar_desk.data.auth_repository import AuthRepository
+from radar_desk.data.sync_repository import SyncRepository
+from radar_desk.services.auth_service import AuthService
+from radar_desk.services.sync_service import SyncService
+from radar_desk.ui.login_dialog import LoginDialog
 from radar_desk.ui.main_window import MainWindow
+from radar_desk.ui.theme import Theme, stylesheet
 
 
 def main() -> int:
@@ -35,7 +41,26 @@ def main() -> int:
     try:
         database = Database(paths.database)
         database.initialize()
-        window = MainWindow(database, paths.files_dir)
+        app.setStyleSheet(stylesheet(Theme.LIGHT))
+        auth_repository = AuthRepository(database)
+        auth_service = AuthService(auth_repository)
+        login = LoginDialog(auth_service)
+        if login.exec() != LoginDialog.DialogCode.Accepted or not login.user:
+            logger.info("Login cancelado")
+            return 0
+        sync_service = SyncService(
+            database,
+            SyncRepository(database),
+            auth_repository,
+            login.user,
+        )
+        window = MainWindow(
+            database,
+            paths.files_dir,
+            login.user,
+            auth_service,
+            sync_service,
+        )
         window.show()
         logger.info("Radar Desk v%s iniciado", APP_VERSION)
         return app.exec()

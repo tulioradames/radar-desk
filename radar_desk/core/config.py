@@ -9,7 +9,7 @@ from pathlib import Path
 
 APP_NAME = "Radar Desk"
 APP_SLUG = "RadarDesk"
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.7.0"
 ORGANIZATION_NAME = "RadarDesk"
 
 

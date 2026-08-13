@@ -36,6 +36,7 @@ from radar_desk.models.ticket import (
     Ticket,
     TicketFilter,
 )
+from radar_desk.models.user import User
 from radar_desk.services.ticket_service import TicketService, TicketValidationError
 from radar_desk.ui.ticket_dialog import TicketDialog
 
@@ -53,9 +54,13 @@ FIELD_LABELS = {
 class TicketsPage(QWidget):
     tickets_changed = Signal()
 
-    def __init__(self, service: TicketService, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, service: TicketService, user: User | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.service = service
+        self.user = user or User(0, "local", "Usuário local", "Administrador", True, "")
         self.tickets: dict[int, Ticket] = {}
         self._build_ui()
         self.refresh()
@@ -98,11 +103,11 @@ class TicketsPage(QWidget):
         self.overdue_label.setObjectName("overdueBadge")
         toolbar_layout.addWidget(self.overdue_label)
 
-        new_button = QPushButton("＋  Novo chamado")
-        new_button.setProperty("primary", True)
-        new_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        new_button.clicked.connect(self._create_ticket)
-        toolbar_layout.addWidget(new_button)
+        self.new_button = QPushButton("＋  Novo chamado")
+        self.new_button.setProperty("primary", True)
+        self.new_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.new_button.clicked.connect(self._create_ticket)
+        toolbar_layout.addWidget(self.new_button)
         return toolbar
 
     def _build_filters(self) -> QWidget:
@@ -472,10 +477,14 @@ class TicketsPage(QWidget):
             f"Aberto em {Ticket.format_datetime(ticket.created_at)}\n"
             f"Atualizado em {Ticket.format_datetime(ticket.updated_at)}"
         )
-        self.edit_button.setEnabled(True)
-        self.delete_button.setEnabled(True)
-        self.reopen_button.setVisible(ticket.status in ("Resolvido", "Encerrado"))
-        self.close_button.setVisible(ticket.status == "Resolvido")
+        self.edit_button.setEnabled(self.user.can_manage_tickets)
+        self.delete_button.setEnabled(self.user.can_administer)
+        self.reopen_button.setVisible(
+            self.user.can_manage_tickets and ticket.status in ("Resolvido", "Encerrado")
+        )
+        self.close_button.setVisible(
+            self.user.can_manage_tickets and ticket.status == "Resolvido"
+        )
         self.comment_author.setEnabled(True)
         self.comment_input.setEnabled(True)
         self.comment_button.setEnabled(True)
