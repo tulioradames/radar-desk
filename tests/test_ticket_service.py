@@ -55,6 +55,10 @@ def test_full_ticket_crud_and_protocol_sequence() -> None:
         assert service.count_active() == 1
         assert updated.assignee == "Técnico local"
 
+        closed = service.close_resolved(first.id)
+        assert closed.status == "Encerrado"
+        assert service.get_history(first.id)[0].action == "Chamado encerrado"
+
         comment = service.add_comment(
             first.id,
             "Conectividade confirmada com o solicitante.",
@@ -132,3 +136,20 @@ def test_ticket_validation_and_missing_records() -> None:
             service.get(999)
         with pytest.raises(TicketNotFoundError):
             service.delete(999)
+
+
+def test_automatic_category_is_applied_when_category_is_others() -> None:
+    with TemporaryDirectory() as directory:
+        database = Database(Path(directory) / "test.sqlite3")
+        database.initialize()
+        service = TicketService(TicketRepository(database))
+
+        ticket = service.create(
+            sample_input(
+                title="Impressora sem papel",
+                description="Não consigo imprimir o relatório.",
+                category="Outros",
+            )
+        )
+
+        assert ticket.category == "Impressão"

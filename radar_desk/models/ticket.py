@@ -16,7 +16,7 @@ CATEGORIES = (
 )
 
 PRIORITIES = ("Baixa", "Média", "Alta", "Crítica")
-STATUSES = ("Aberto", "Em andamento", "Aguardando", "Resolvido")
+STATUSES = ("Aberto", "Em andamento", "Aguardando", "Resolvido", "Encerrado")
 
 
 @dataclass(frozen=True, slots=True)
