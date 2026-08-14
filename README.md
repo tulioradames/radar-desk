@@ -1,6 +1,6 @@
 # Radar Desk
 
-Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.7.0** e adiciona usuários, auditoria e sincronização opcional sem comprometer o funcionamento offline.
+Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.8.0** e adiciona relatórios operacionais, avaliações e exportações sem comprometer o funcionamento offline.
 
 ## O que já está pronto
 
@@ -44,15 +44,22 @@ Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A ve
 - fila local compactada, com novas tentativas quando a internet retornar;
 - sincronização opcional com Supabase sem duplicar chamados pelo protocolo;
 - resolução determinística de conflitos por versão e data de atualização;
+- painel de relatórios com filtro por período de abertura;
+- chamados agrupados por status, categoria e prioridade;
+- volume de chamados por dia e relação de SLAs atrasados;
+- cálculo do tempo médio até a resolução;
+- avaliação de atendimento de 1 a 5 estrelas por chamado concluído;
+- exportação de relatório detalhado para Excel (`.xlsx`);
+- geração de relatório operacional em PDF;
 - diretórios locais de dados, arquivos e logs;
 - estrutura modular preparada para as próximas versões;
 - testes automatizados da base e da interface.
 
-Relatórios e distribuição permanecem preparados como módulos futuros.
+A distribuição oficial para Windows permanece preparada como a próxima etapa.
 
 ## Primeiro acesso
 
-Ao abrir a versão 0.7 pela primeira vez, o Radar Desk solicita a criação do administrador local. Nos acessos seguintes, use essa conta para entrar. As credenciais permanecem no SQLite local e a senha nunca é armazenada em texto puro.
+Ao abrir o Radar Desk pela primeira vez, o aplicativo solicita a criação do administrador local. Nos acessos seguintes, use essa conta para entrar. As credenciais permanecem no SQLite local e a senha nunca é armazenada em texto puro.
 
 ## Sincronização opcional com Supabase
 
@@ -134,9 +141,9 @@ RadarDesk/
 └── pyproject.toml  # metadados e dependências
 ```
 
-## Arquitetura futura
+## Próxima etapa
 
-O SQLite permanece como fonte local para o funcionamento offline. A sincronização com Supabase será adicionada somente na versão 0.7, por uma camada separada de sincronização, sem inserir credenciais ou dependência de rede no aplicativo atual.
+A versão 1.0 preparará a distribuição oficial para Windows, com ícone final, instalador, atalhos, dados demonstrativos, atualização automática e documentação de entrega.
 
 ## Licença
 
