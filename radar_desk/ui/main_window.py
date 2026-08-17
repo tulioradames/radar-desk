@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QTimer, Qt
+from PySide6.QtCore import QSettings, QThread, QTimer, QUrl, Signal, Qt
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -30,13 +33,16 @@ from radar_desk.data.report_repository import ReportRepository
 from radar_desk.data.sync_repository import SyncRepository
 from radar_desk.data.ticket_repository import TicketRepository
 from radar_desk.models.user import User
+from radar_desk.models.update import UpdateInfo
 from radar_desk.services.attachment_service import AttachmentService
 from radar_desk.services.auth_service import AuthService
 from radar_desk.services.change_tracker import ChangeTracker
 from radar_desk.services.diagnostic_service import DiagnosticService
+from radar_desk.services.demo_data_service import DemoDataService
 from radar_desk.services.report_service import ReportService
 from radar_desk.services.sync_service import SyncService
 from radar_desk.services.ticket_service import TicketService
+from radar_desk.services.update_service import UpdateService
 from radar_desk.ui.administration_page import AdministrationPage
 from radar_desk.ui.attachments_page import AttachmentsPage
 from radar_desk.ui.diagnostic_page import DiagnosticPage
@@ -44,6 +50,20 @@ from radar_desk.ui.reports_page import ReportsPage
 from radar_desk.ui.theme import Theme, stylesheet
 from radar_desk.ui.tickets_page import TicketsPage
 from radar_desk.ui.widgets import RadarLogo, RoadmapItem, StatCard
+
+
+class UpdateCheckThread(QThread):
+    completed = Signal(object, object)
+
+    def __init__(self, service: UpdateService, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.service = service
+
+    def run(self) -> None:
+        try:
+            self.completed.emit(self.service.check(), None)
+        except Exception as error:  # erro entregue à interface na thread principal
+            self.completed.emit(None, error)
 
 
 class MainWindow(QMainWindow):
@@ -84,6 +104,10 @@ class MainWindow(QMainWindow):
         self.report_service = ReportService(
             ReportRepository(database), tracker=self.tracker
         )
+        self.demo_service = DemoDataService(database, self.ticket_service.repository)
+        self.update_service = UpdateService(APP_VERSION)
+        self.available_update: UpdateInfo | None = None
+        self.update_worker: UpdateCheckThread | None = None
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
         self.page_metadata: list[tuple[str, str]] = []
@@ -94,6 +118,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._restore_theme()
         self._setup_sla_notifications()
+        self._setup_update_checks()
         self._select_page(0)
 
     def _build_ui(self) -> None:
@@ -274,14 +299,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("RELATÓRIOS OPERACIONAIS DISPONÍVEIS")
+        eyebrow = QLabel("VERSÃO 1.0 OFICIAL")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Transforme chamados locais em decisões melhores.")
+        title = QLabel("Seu service desk local está pronto para produção.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Acompanhe volume, prazos, tempo médio e satisfação por período. "
-            "Exporte relatórios completos para Excel ou PDF sem depender da internet."
+            "Instale no Windows, trabalhe offline e receba avisos de novas versões. "
+            "Chamados, diagnósticos, evidências, automações e relatórios em um só lugar."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -315,7 +340,7 @@ class MainWindow(QMainWindow):
         roadmap_layout = QVBoxLayout(roadmap)
         roadmap_layout.setContentsMargins(20, 18, 20, 20)
         roadmap_layout.setSpacing(9)
-        roadmap_title = QLabel("Próximas entregas")
+        roadmap_title = QLabel("Jornada da versão oficial")
         roadmap_title.setObjectName("sectionTitle")
         roadmap_layout.addWidget(roadmap_title)
         roadmap_layout.addWidget(RoadmapItem("1", "Base do aplicativo", "Janela, navegação, temas e SQLite", True))
@@ -326,6 +351,7 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização", True))
         roadmap_layout.addWidget(RoadmapItem("7", "Usuários e sincronização", "Perfis, fila offline e Supabase", True))
         roadmap_layout.addWidget(RoadmapItem("8", "Relatórios", "Indicadores, Excel, PDF e avaliações", True))
+        roadmap_layout.addWidget(RoadmapItem("9", "Distribuição oficial", "Instalador, atalhos, atualização e documentação", True))
         layout.addWidget(roadmap)
         layout.addStretch()
 
@@ -397,6 +423,74 @@ class MainWindow(QMainWindow):
         database_layout.addWidget(db_heading)
         database_layout.addWidget(db_detail)
         layout.addWidget(database_card)
+
+        update_card = QFrame()
+        update_card.setProperty("card", True)
+        update_layout = QVBoxLayout(update_card)
+        update_layout.setContentsMargins(22, 20, 22, 22)
+        update_layout.setSpacing(8)
+        update_heading = QLabel("Atualizações")
+        update_heading.setObjectName("sectionTitle")
+        update_detail = QLabel(
+            "O Radar Desk consulta automaticamente as versões oficiais publicadas "
+            "no GitHub. O download só começa após sua confirmação."
+        )
+        update_detail.setProperty("muted", True)
+        update_detail.setWordWrap(True)
+        self.update_status = QLabel(f"Versão instalada: {APP_VERSION}")
+        self.update_status.setProperty("muted", True)
+        update_actions = QHBoxLayout()
+        self.auto_update_check = QCheckBox("Verificar automaticamente")
+        self.auto_update_check.setChecked(
+            str(self.settings.value("updates/automatic", "true")).lower() != "false"
+        )
+        self.auto_update_check.toggled.connect(
+            lambda enabled: self.settings.setValue("updates/automatic", enabled)
+        )
+        self.update_check_button = QPushButton("Verificar agora")
+        self.update_check_button.setProperty("secondary", True)
+        self.update_check_button.clicked.connect(
+            lambda: self._check_for_updates(silent=False)
+        )
+        self.update_download_button = QPushButton("Baixar atualização")
+        self.update_download_button.setProperty("primary", True)
+        self.update_download_button.clicked.connect(self._open_available_update)
+        self.update_download_button.hide()
+        update_actions.addWidget(self.auto_update_check)
+        update_actions.addStretch()
+        update_actions.addWidget(self.update_check_button)
+        update_actions.addWidget(self.update_download_button)
+        update_layout.addWidget(update_heading)
+        update_layout.addWidget(update_detail)
+        update_layout.addWidget(self.update_status)
+        update_layout.addLayout(update_actions)
+        layout.addWidget(update_card)
+
+        demo_card = QFrame()
+        demo_card.setProperty("card", True)
+        demo_layout = QHBoxLayout(demo_card)
+        demo_layout.setContentsMargins(22, 20, 22, 22)
+        demo_copy = QVBoxLayout()
+        demo_heading = QLabel("Dados demonstrativos")
+        demo_heading.setObjectName("sectionTitle")
+        self.demo_status = QLabel(
+            "Conjunto demonstrativo já carregado."
+            if self.demo_service.is_loaded()
+            else "Adicione seis chamados fictícios para explorar painéis e relatórios."
+        )
+        self.demo_status.setProperty("muted", True)
+        self.demo_status.setWordWrap(True)
+        demo_copy.addWidget(demo_heading)
+        demo_copy.addWidget(self.demo_status)
+        self.demo_button = QPushButton("Carregar demonstração")
+        self.demo_button.setProperty("secondary", True)
+        self.demo_button.setEnabled(
+            self.user.can_administer and not self.demo_service.is_loaded()
+        )
+        self.demo_button.clicked.connect(self._load_demo_data)
+        demo_layout.addLayout(demo_copy, 1)
+        demo_layout.addWidget(self.demo_button)
+        layout.addWidget(demo_card)
         layout.addStretch()
         return page
 
@@ -447,6 +541,110 @@ class MainWindow(QMainWindow):
             self.theme_button.setText("☾  Tema")
             self.theme_button.setToolTip("Ativar modo escuro")
 
+    def _setup_update_checks(self) -> None:
+        self.update_timer = QTimer(self)
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(10_000)
+        self.update_timer.timeout.connect(self._automatic_update_check)
+        self.update_timer.start()
+
+    def _automatic_update_check(self) -> None:
+        if self.auto_update_check.isChecked():
+            self._check_for_updates(silent=True)
+
+    def _check_for_updates(self, silent: bool) -> None:
+        if self.update_worker and self.update_worker.isRunning():
+            return
+        self.update_status.setText("Verificando atualizações…")
+        self.update_check_button.setEnabled(False)
+        worker = UpdateCheckThread(self.update_service, self)
+        worker.completed.connect(
+            lambda update, error: self._update_check_finished(
+                update, error, silent
+            )
+        )
+        worker.finished.connect(lambda: self._update_thread_finished(worker))
+        self.update_worker = worker
+        worker.start()
+
+    def _update_thread_finished(self, worker: UpdateCheckThread) -> None:
+        if self.update_worker is worker:
+            self.update_worker = None
+        worker.deleteLater()
+
+    def _update_check_finished(
+        self,
+        update: UpdateInfo | None,
+        error: Exception | None,
+        silent: bool,
+    ) -> None:
+        self.update_check_button.setEnabled(True)
+        if error:
+            self.update_status.setText(
+                "Não foi possível verificar agora. O aplicativo continua funcionando offline."
+            )
+            if not silent:
+                QMessageBox.information(
+                    self,
+                    "Atualização indisponível",
+                    "Não foi possível consultar o GitHub. Tente novamente quando houver conexão.",
+                )
+            return
+        self.available_update = update
+        if update:
+            self.update_status.setText(
+                f"Nova versão disponível: {update.version} · {update.name}"
+            )
+            self.update_download_button.show()
+            if self.tray_icon:
+                self.tray_icon.showMessage(
+                    "Atualização do Radar Desk",
+                    f"A versão {update.version} está disponível.",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    7000,
+                )
+        else:
+            self.update_status.setText(
+                f"Radar Desk {APP_VERSION} está atualizado."
+            )
+            self.update_download_button.hide()
+
+    def _open_available_update(self) -> None:
+        if not self.available_update:
+            return
+        url = self.available_update.installer_url or self.available_update.release_url
+        if not url:
+            QMessageBox.warning(
+                self,
+                "Instalador indisponível",
+                "A versão foi encontrada, mas ainda não possui instalador publicado.",
+            )
+            return
+        QDesktopServices.openUrl(QUrl(url))
+
+    def _load_demo_data(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Carregar dados demonstrativos",
+            "Serão criados seis chamados fictícios no banco local. Deseja continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        created = self.demo_service.load()
+        self.demo_button.setEnabled(False)
+        self.demo_status.setText(
+            f"{created} chamados demonstrativos carregados."
+            if created
+            else "O conjunto demonstrativo já estava carregado."
+        )
+        self.tickets_page.refresh()
+        self.diagnostic_page.refresh_tickets()
+        self.attachments_page.refresh_tickets()
+        self.reports_page.refresh()
+        self._refresh_dashboard()
+
     def _setup_sla_notifications(self) -> None:
         self.notified_sla_alerts: set[tuple[int, str]] = set()
         self.tray_icon: QSystemTrayIcon | None = None
@@ -483,6 +681,10 @@ class MainWindow(QMainWindow):
         self._refresh_dashboard()
 
     def closeEvent(self, event) -> None:  # noqa: N802 - API Qt
+        if hasattr(self, "update_timer"):
+            self.update_timer.stop()
+        if self.update_worker and self.update_worker.isRunning():
+            self.update_worker.wait(9_000)
         if self.tray_icon:
             self.tray_icon.hide()
         super().closeEvent(event)
