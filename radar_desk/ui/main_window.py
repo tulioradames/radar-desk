@@ -23,12 +23,19 @@ from PySide6.QtWidgets import (
 
 from radar_desk.core.config import APP_NAME, APP_VERSION, ORGANIZATION_NAME
 from radar_desk.data.attachment_repository import AttachmentRepository
+from radar_desk.data.auth_repository import AuthRepository
 from radar_desk.data.database import Database
 from radar_desk.data.diagnostic_repository import DiagnosticRepository
+from radar_desk.data.sync_repository import SyncRepository
 from radar_desk.data.ticket_repository import TicketRepository
+from radar_desk.models.user import User
 from radar_desk.services.attachment_service import AttachmentService
+from radar_desk.services.auth_service import AuthService
+from radar_desk.services.change_tracker import ChangeTracker
 from radar_desk.services.diagnostic_service import DiagnosticService
+from radar_desk.services.sync_service import SyncService
 from radar_desk.services.ticket_service import TicketService
+from radar_desk.ui.administration_page import AdministrationPage
 from radar_desk.ui.attachments_page import AttachmentsPage
 from radar_desk.ui.diagnostic_page import DiagnosticPage
 from radar_desk.ui.theme import Theme, stylesheet
@@ -37,18 +44,37 @@ from radar_desk.ui.widgets import RadarLogo, RoadmapItem, StatCard
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, database: Database, files_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        database: Database,
+        files_dir: Path | None = None,
+        user: User | None = None,
+        auth_service: AuthService | None = None,
+        sync_service: SyncService | None = None,
+    ) -> None:
         super().__init__()
         self.database = database
         self.files_dir = files_dir or (database.path.parent / "arquivos")
-        self.ticket_service = TicketService(TicketRepository(database))
+        self.user = user or User(0, "local", "Usuário local", "Administrador", True, "")
+        self.auth_service = auth_service or AuthService(AuthRepository(database))
+        self.sync_repository = SyncRepository(database)
+        tracker = (
+            ChangeTracker(self.user, self.auth_service, self.sync_repository)
+            if user is not None else None
+        )
+        self.ticket_service = TicketService(TicketRepository(database), tracker=tracker)
+        self.sync_service = sync_service or SyncService(
+            database, self.sync_repository, self.auth_service.repository, self.user
+        )
         self.diagnostic_service = DiagnosticService(
             DiagnosticRepository(database),
             self.files_dir,
+            tracker=tracker,
         )
         self.attachment_service = AttachmentService(
             AttachmentRepository(database),
             self.files_dir,
+            tracker=tracker,
         )
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
@@ -85,7 +111,7 @@ class MainWindow(QMainWindow):
             "Acompanhe a evolução e o estado local do Radar Desk.",
             self._build_dashboard(),
         )
-        self.tickets_page = TicketsPage(self.ticket_service)
+        self.tickets_page = TicketsPage(self.ticket_service, self.user)
         self.tickets_page.tickets_changed.connect(self._refresh_dashboard)
         self._add_page(
             "Chamados",
@@ -113,6 +139,13 @@ class MainWindow(QMainWindow):
             "Arquivos",
             "Anexe evidências e visualize imagens sem sair do Radar Desk.",
             self.attachments_page,
+        )
+        self._add_page(
+            "Sincronização",
+            "Gerencie usuários, auditoria e alterações offline pendentes.",
+            AdministrationPage(
+                self.user, self.auth_service, self.sync_service
+            ),
         )
         self._add_page(
             "Relatórios",
@@ -158,16 +191,17 @@ class MainWindow(QMainWindow):
             ("Chamados", 1),
             ("Diagnóstico", 2),
             ("Arquivos", 3),
-            ("Relatórios", 4),
-            ("Ajustes", 5),
+            ("Sincronização", 4),
+            ("Relatórios", 5),
+            ("Ajustes", 6),
         ]
         for label, index in entries:
             layout.addWidget(self._nav_button(label, index))
 
         layout.addStretch()
-        offline = QLabel("●  Local")
+        offline = QLabel(f"●  Local · @{self.user.username}")
         offline.setObjectName("offlineLabel")
-        offline.setToolTip("Operação local ativa — nenhuma internet necessária")
+        offline.setToolTip(f"Sessão @{self.user.username} · {self.user.role}")
         layout.addWidget(offline)
 
         self.theme_button = QToolButton()
@@ -230,14 +264,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("SLA E AUTOMAÇÕES DISPONÍVEIS")
+        eyebrow = QLabel("USUÁRIOS E SINCRONIZAÇÃO DISPONÍVEIS")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Prazos visíveis, atendimento mais previsível.")
+        title = QLabel("Trabalhe offline com rastreabilidade total.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Acompanhe vencimentos por prioridade, receba alertas no Windows e "
-            "classifique novos chamados automaticamente."
+            "Entre com perfis locais, registre cada ação e mantenha alterações na "
+            "fila até a conexão retornar. O Supabase continua opcional."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -280,7 +314,8 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("4", "Diagnóstico automático", "Sistema, recursos, rede, ping e consentimento", True))
         roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos", True))
         roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização", True))
-        roadmap_layout.addWidget(RoadmapItem("7", "Usuários e sincronização", "Perfis, fila offline e Supabase"))
+        roadmap_layout.addWidget(RoadmapItem("7", "Usuários e sincronização", "Perfis, fila offline e Supabase", True))
+        roadmap_layout.addWidget(RoadmapItem("8", "Relatórios", "Indicadores, Excel e PDF"))
         layout.addWidget(roadmap)
         layout.addStretch()
 

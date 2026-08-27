@@ -12,6 +12,7 @@ from pathlib import Path
 from radar_desk.data.attachment_repository import AttachmentRepository
 from radar_desk.models.attachment import TicketAttachment
 from radar_desk.models.ticket import Ticket
+from radar_desk.services.change_tracker import ChangeTracker
 
 
 class AttachmentValidationError(ValueError):
@@ -41,10 +42,12 @@ class AttachmentService:
         repository: AttachmentRepository,
         files_dir: Path,
         clock: Callable[[], datetime] | None = None,
+        tracker: ChangeTracker | None = None,
     ) -> None:
         self.repository = repository
         self.files_dir = Path(files_dir)
         self.clock = clock or (lambda: datetime.now().astimezone())
+        self.tracker = tracker
 
     def attach_many(
         self, ticket: Ticket, source_paths: Iterable[Path | str]
@@ -71,7 +74,7 @@ class AttachmentService:
         try:
             shutil.copy2(source, destination)
             mime_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
-            return self.repository.create(
+            attached = self.repository.create(
                 ticket.id,
                 source.name,
                 destination.name,
@@ -81,6 +84,12 @@ class AttachmentService:
                 size,
                 self.clock(),
             )
+            if self.tracker:
+                self.tracker.record(
+                    "Arquivo anexado", "attachment",
+                    f"{ticket.protocol}:{attached.id}", "create", attached
+                )
+            return attached
         except Exception:
             destination.unlink(missing_ok=True)
             raise

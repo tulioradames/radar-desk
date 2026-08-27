@@ -1,6 +1,6 @@
 # Radar Desk
 
-Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.6.0** e adiciona SLA e automações operacionais sem depender de serviços externos.
+Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.7.0** e adiciona usuários, auditoria e sincronização opcional sem comprometer o funcionamento offline.
 
 ## O que já está pronto
 
@@ -36,11 +36,35 @@ Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A ve
 - notificações nativas do Windows para alertas de SLA;
 - categorização automática por palavras-chave durante o cadastro;
 - confirmação antes de encerrar um chamado resolvido;
+- primeiro acesso com criação segura do administrador local;
+- login offline com senhas protegidas por PBKDF2 e salt individual;
+- perfis de Solicitante, Atendente e Administrador;
+- permissões operacionais aplicadas conforme o perfil;
+- auditoria de login, chamados, comentários, arquivos, diagnósticos e sincronização;
+- fila local compactada, com novas tentativas quando a internet retornar;
+- sincronização opcional com Supabase sem duplicar chamados pelo protocolo;
+- resolução determinística de conflitos por versão e data de atualização;
 - diretórios locais de dados, arquivos e logs;
 - estrutura modular preparada para as próximas versões;
 - testes automatizados da base e da interface.
 
-Usuários, sincronização e relatórios permanecem preparados como módulos futuros.
+Relatórios e distribuição permanecem preparados como módulos futuros.
+
+## Primeiro acesso
+
+Ao abrir a versão 0.7 pela primeira vez, o Radar Desk solicita a criação do administrador local. Nos acessos seguintes, use essa conta para entrar. As credenciais permanecem no SQLite local e a senha nunca é armazenada em texto puro.
+
+## Sincronização opcional com Supabase
+
+O aplicativo funciona integralmente sem servidor. Para habilitar a sincronização, execute [`supabase/schema.sql`](supabase/schema.sql) no projeto Supabase e defina antes de iniciar:
+
+```powershell
+$env:SUPABASE_URL="https://seu-projeto.supabase.co"
+$env:SUPABASE_ANON_KEY="sua-chave"
+$env:SUPABASE_ACCESS_TOKEN="token-jwt-de-um-usuario-autenticado"
+```
+
+As alterações feitas sem conexão permanecem na fila SQLite. O aplicativo tenta novamente automaticamente a cada minuto e também oferece sincronização manual. As chaves e o token não são gravados no código nem no banco local. O token deve pertencer a um usuário autenticado no Supabase, conforme a política RLS fornecida.
 
 ## Requisitos
 

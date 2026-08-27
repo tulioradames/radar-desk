@@ -19,6 +19,7 @@ from pathlib import Path
 from radar_desk.data.diagnostic_repository import DiagnosticRepository
 from radar_desk.models.diagnostic import AttachedDiagnostic, DiagnosticSnapshot
 from radar_desk.models.ticket import Ticket
+from radar_desk.services.change_tracker import ChangeTracker
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,10 +184,12 @@ class DiagnosticService:
         repository: DiagnosticRepository,
         files_dir: Path,
         collector: DiagnosticCollector | None = None,
+        tracker: ChangeTracker | None = None,
     ) -> None:
         self.repository = repository
         self.files_dir = files_dir
         self.collector = collector or DiagnosticCollector()
+        self.tracker = tracker
 
     def collect(self) -> DiagnosticSnapshot:
         return self.collector.collect()
@@ -217,12 +220,18 @@ class DiagnosticService:
             json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        return self.repository.create(
+        attached = self.repository.create(
             ticket.id,
             snapshot,
             str(report_path),
             str(screenshot_path) if screenshot_path else "",
         )
+        if self.tracker:
+            self.tracker.record(
+                "Diagnóstico anexado", "diagnostic",
+                f"{ticket.protocol}:{attached.id}", "create", attached
+            )
+        return attached
 
     def list_for_ticket(self, ticket_id: int) -> list[AttachedDiagnostic]:
         return self.repository.list_for_ticket(ticket_id)
