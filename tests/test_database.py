@@ -49,6 +49,7 @@ def test_version_two_creates_ticket_tables() -> None:
         assert "users" in tables
         assert "audit_log" in tables
         assert "sync_queue" in tables
+        assert "ticket_ratings" in tables
 
         with database.connect() as connection:
             columns = {

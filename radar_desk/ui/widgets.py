@@ -75,6 +75,7 @@ class StatCard(QFrame):
         self.value_label.setProperty("statValue", True)
         caption = QLabel(label)
         caption.setProperty("statLabel", True)
+        caption.setWordWrap(True)
         text.addWidget(self.value_label)
         text.addWidget(caption)
         text.addStretch()

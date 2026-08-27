@@ -175,6 +175,32 @@ class SyncService:
         return "local" if local_time >= remote_time else "remote"
 
     def _apply_remote(self, entity_type: str, operation: str, payload: dict[str, Any]) -> None:
+        if entity_type == "ticket_rating":
+            with self.database.connect() as connection:
+                ticket = connection.execute(
+                    "SELECT id FROM tickets WHERE protocol = ?", (payload.get("protocol"),)
+                ).fetchone()
+                if not ticket:
+                    return
+                connection.execute(
+                    """
+                    INSERT INTO ticket_ratings (
+                        ticket_id, rating, comment, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(ticket_id) DO UPDATE SET
+                        rating=excluded.rating,
+                        comment=excluded.comment,
+                        updated_at=excluded.updated_at
+                    """,
+                    (
+                        int(ticket["id"]),
+                        int(payload.get("rating") or 0),
+                        str(payload.get("comment") or ""),
+                        str(payload.get("created_at") or payload.get("changed_at") or self.clock().isoformat(timespec="seconds")),
+                        str(payload.get("updated_at") or payload.get("changed_at") or self.clock().isoformat(timespec="seconds")),
+                    ),
+                )
+            return
         if entity_type != "ticket" or not payload.get("protocol"):
             return
         with self.database.connect() as connection:

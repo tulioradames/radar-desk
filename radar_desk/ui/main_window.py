@@ -26,6 +26,7 @@ from radar_desk.data.attachment_repository import AttachmentRepository
 from radar_desk.data.auth_repository import AuthRepository
 from radar_desk.data.database import Database
 from radar_desk.data.diagnostic_repository import DiagnosticRepository
+from radar_desk.data.report_repository import ReportRepository
 from radar_desk.data.sync_repository import SyncRepository
 from radar_desk.data.ticket_repository import TicketRepository
 from radar_desk.models.user import User
@@ -33,11 +34,13 @@ from radar_desk.services.attachment_service import AttachmentService
 from radar_desk.services.auth_service import AuthService
 from radar_desk.services.change_tracker import ChangeTracker
 from radar_desk.services.diagnostic_service import DiagnosticService
+from radar_desk.services.report_service import ReportService
 from radar_desk.services.sync_service import SyncService
 from radar_desk.services.ticket_service import TicketService
 from radar_desk.ui.administration_page import AdministrationPage
 from radar_desk.ui.attachments_page import AttachmentsPage
 from radar_desk.ui.diagnostic_page import DiagnosticPage
+from radar_desk.ui.reports_page import ReportsPage
 from radar_desk.ui.theme import Theme, stylesheet
 from radar_desk.ui.tickets_page import TicketsPage
 from radar_desk.ui.widgets import RadarLogo, RoadmapItem, StatCard
@@ -58,23 +61,28 @@ class MainWindow(QMainWindow):
         self.user = user or User(0, "local", "Usuário local", "Administrador", True, "")
         self.auth_service = auth_service or AuthService(AuthRepository(database))
         self.sync_repository = SyncRepository(database)
-        tracker = (
+        self.tracker = (
             ChangeTracker(self.user, self.auth_service, self.sync_repository)
             if user is not None else None
         )
-        self.ticket_service = TicketService(TicketRepository(database), tracker=tracker)
+        self.ticket_service = TicketService(
+            TicketRepository(database), tracker=self.tracker
+        )
         self.sync_service = sync_service or SyncService(
             database, self.sync_repository, self.auth_service.repository, self.user
         )
         self.diagnostic_service = DiagnosticService(
             DiagnosticRepository(database),
             self.files_dir,
-            tracker=tracker,
+            tracker=self.tracker,
         )
         self.attachment_service = AttachmentService(
             AttachmentRepository(database),
             self.files_dir,
-            tracker=tracker,
+            tracker=self.tracker,
+        )
+        self.report_service = ReportService(
+            ReportRepository(database), tracker=self.tracker
         )
         self.settings = QSettings(ORGANIZATION_NAME, APP_NAME)
         self.nav_buttons: list[QPushButton] = []
@@ -147,10 +155,12 @@ class MainWindow(QMainWindow):
                 self.user, self.auth_service, self.sync_service
             ),
         )
+        self.reports_page = ReportsPage(self.report_service)
+        self.tickets_page.tickets_changed.connect(self.reports_page.refresh)
         self._add_page(
             "Relatórios",
-            "Indicadores operacionais e exportações.",
-            self._build_coming_page("0.8", "Relatórios e indicadores", "Painéis, Excel e PDF serão adicionados nesta etapa."),
+            "Indicadores operacionais, avaliações e exportações em Excel e PDF.",
+            self.reports_page,
         )
         self._add_page(
             "Configurações",
@@ -264,14 +274,14 @@ class MainWindow(QMainWindow):
 
         copy = QVBoxLayout()
         copy.setSpacing(8)
-        eyebrow = QLabel("USUÁRIOS E SINCRONIZAÇÃO DISPONÍVEIS")
+        eyebrow = QLabel("RELATÓRIOS OPERACIONAIS DISPONÍVEIS")
         eyebrow.setObjectName("heroEyebrow")
-        title = QLabel("Trabalhe offline com rastreabilidade total.")
+        title = QLabel("Transforme chamados locais em decisões melhores.")
         title.setObjectName("heroTitle")
         title.setWordWrap(True)
         detail = QLabel(
-            "Entre com perfis locais, registre cada ação e mantenha alterações na "
-            "fila até a conexão retornar. O Supabase continua opcional."
+            "Acompanhe volume, prazos, tempo médio e satisfação por período. "
+            "Exporte relatórios completos para Excel ou PDF sem depender da internet."
         )
         detail.setObjectName("heroText")
         detail.setWordWrap(True)
@@ -315,7 +325,7 @@ class MainWindow(QMainWindow):
         roadmap_layout.addWidget(RoadmapItem("5", "Arquivos e evidências", "Anexos, imagens e documentos", True))
         roadmap_layout.addWidget(RoadmapItem("6", "SLA e automações", "Prazos, alertas e categorização", True))
         roadmap_layout.addWidget(RoadmapItem("7", "Usuários e sincronização", "Perfis, fila offline e Supabase", True))
-        roadmap_layout.addWidget(RoadmapItem("8", "Relatórios", "Indicadores, Excel e PDF"))
+        roadmap_layout.addWidget(RoadmapItem("8", "Relatórios", "Indicadores, Excel, PDF e avaliações", True))
         layout.addWidget(roadmap)
         layout.addStretch()
 

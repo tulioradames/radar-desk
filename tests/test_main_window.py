@@ -29,6 +29,8 @@ def test_main_window_has_all_base_pages() -> None:
         assert window.tickets_page.list_stack.currentIndex() == 1
         assert window.diagnostic_page.ticket_combo.count() == 1
         assert window.attachments_page.ticket_combo.count() == 1
+        assert window.reports_page.current_snapshot.total == 0
+        assert window.reports_page.status_table.rowCount() == 5
         window.close()
     app.processEvents()
 
