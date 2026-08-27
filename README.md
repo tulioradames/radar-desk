@@ -1,6 +1,6 @@
 # Radar Desk
 
-Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **0.8.0** e adiciona relatórios operacionais, avaliações e exportações sem comprometer o funcionamento offline.
+Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A versão atual é a **1.0.0 oficial**, com instalador, atalhos, atualização assistida, dados demonstrativos e processo automatizado de publicação.
 
 ## O que já está pronto
 
@@ -51,11 +51,22 @@ Aplicativo Windows, local-first, para abertura e gerenciamento de chamados. A ve
 - avaliação de atendimento de 1 a 5 estrelas por chamado concluído;
 - exportação de relatório detalhado para Excel (`.xlsx`);
 - geração de relatório operacional em PDF;
+- ícone oficial para aplicativo e instalador;
+- empacotamento reproduzível com PyInstaller;
+- instalador por usuário com atalhos no menu Iniciar e na área de trabalho;
+- verificação automática de novas versões oficiais no GitHub;
+- carga opcional e idempotente de dados demonstrativos;
+- workflow para testar e publicar releases do Windows;
+- documentação de instalação, uso, publicação e vídeo;
 - diretórios locais de dados, arquivos e logs;
 - estrutura modular preparada para as próximas versões;
 - testes automatizados da base e da interface.
 
-A distribuição oficial para Windows permanece preparada como a próxima etapa.
+Esta é a primeira versão oficial para distribuição no Windows.
+
+## Instalação oficial
+
+Baixe o instalador mais recente na página de [releases](https://github.com/tulioradames/radar-desk/releases). Consulte [docs/INSTALACAO.md](docs/INSTALACAO.md) para verificar o SHA-256, instalar, atualizar ou desinstalar.
 
 ## Primeiro acesso
 
@@ -108,6 +119,16 @@ Também é possível executar diretamente:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+## Gerar o aplicativo Windows
+
+Com o Inno Setup 6 instalado:
+
+```powershell
+.\scripts\build.ps1
+```
+
+Os artefatos são gravados em `dist\RadarDesk` e `dist\installer`. O mesmo processo é executado pelo workflow de release do GitHub.
+
 ## Dados locais
 
 Por padrão, os dados são gravados em:
@@ -141,9 +162,12 @@ RadarDesk/
 └── pyproject.toml  # metadados e dependências
 ```
 
-## Próxima etapa
+## Documentação
 
-A versão 1.0 preparará a distribuição oficial para Windows, com ícone final, instalador, atalhos, dados demonstrativos, atualização automática e documentação de entrega.
+- [Instalação](docs/INSTALACAO.md)
+- [Guia rápido](docs/GUIA_RAPIDO.md)
+- [Publicação de versões](docs/PUBLICACAO.md)
+- [Roteiro do vídeo](docs/VIDEO-ROTEIRO.md)
 
 ## Licença
 

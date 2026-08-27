@@ -1,0 +1,66 @@
+name: Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Executar testes
+        shell: pwsh
+        run: python -m pytest
+
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Gerar aplicativo e instalador
+        shell: pwsh
+        run: .\scripts\build.ps1 -SkipTests
+
+      - name: Publicar artefato do workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: RadarDesk-Windows-${{ github.ref_name }}
+          path: |
+            dist/installer/*.exe
+            dist/installer/*.sha256
+          if-no-files-found: error
+
+      - name: Criar GitHub Release para a tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem -LiteralPath "dist\installer" -File
+          $arguments = @(
+            "release", "create", $env:GITHUB_REF_NAME,
+            "--title", "Radar Desk $env:GITHUB_REF_NAME",
+            "--generate-notes"
+          )
+          $arguments += $files.FullName
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao criar o GitHub Release." }

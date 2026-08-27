@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radar-desk"
-version = "0.8.0"
+version = "1.0.0"
 description = "Aplicativo Windows para abertura e gerenciamento de chamados."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,7 +21,7 @@ radar-desk = "radar_desk.main:main"
 include = ["radar_desk*"]
 
 [tool.setuptools.package-data]
-"radar_desk.resources" = ["*.svg"]
+"radar_desk.resources" = ["*.svg", "*.png", "*.ico"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

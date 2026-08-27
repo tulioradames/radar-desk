@@ -22,7 +22,28 @@ from radar_desk.ui.main_window import MainWindow
 from radar_desk.ui.theme import Theme, stylesheet
 
 
+def run_self_test() -> int:
+    """Valida a inicialização do armazenamento sem abrir a interface."""
+
+    paths = get_app_paths()
+    paths.ensure()
+    configure_logging(paths.logs_dir)
+    database = Database(paths.database)
+    database.initialize()
+    logging.getLogger(__name__).info(
+        "Autoteste do Radar Desk v%s concluído", APP_VERSION
+    )
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv:
+        try:
+            return run_self_test()
+        except Exception:
+            logging.exception("Falha no autoteste do Radar Desk")
+            return 1
+
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
